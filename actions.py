@@ -26,13 +26,18 @@ class RefrigerantTypes(Enum):
 
 
 class Action:
-    def __init__(self, id, documents:list, agentUsers, createdDate, actionType: ActionTypes, emissionsOffset, emissionsEmitted):
+    def __init__(self, id, documents:list, agentUsers:list, createdDate, actionType: ActionTypes, emissionsOffset, emissionsEmitted):
         self.netEmissions = emissionsOffset - emissionsEmitted
         self.id = id
         self.documents = documents
         self.agentUsers = agentUsers
         self.createdDate = createdDate
         self.type = actionType
+        
+        # Check for duplicate document IDs
+        document_ids = [doc.id for doc in documents]
+        if len(set(document_ids)) != len(document_ids):
+            raise ValueError("Duplicate document IDs found")
     
     def update_net_emissions(self):
         self.netEmissions = self.emissions_offset - self.emissions_emitted

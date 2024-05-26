@@ -1,6 +1,6 @@
 from actions import Action
 from offset import Offset
-from user import User
+from users import User
 
 
 
