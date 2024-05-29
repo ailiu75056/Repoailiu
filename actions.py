@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from users import User, Agent
+from users import User, Agent, Buyer
 
 class ActionTypes(Enum): 
     Collection = "Collection"
@@ -26,7 +26,7 @@ class RefrigerantTypes(Enum):
 
 
 class Action:
-    def __init__(self, id, documents:list, agentUsers:list, createdDate, actionType: ActionTypes, emissionsOffset, emissionsEmitted):
+    def __init__(self, id, documents:list,  agentUsers:list, createdDate, actionType: ActionTypes, emissionsOffset = 0, emissionsEmitted = 0):
         self.netEmissions = emissionsOffset - emissionsEmitted
         self.id = id
         self.documents = documents
@@ -38,14 +38,36 @@ class Action:
         document_ids = [doc.id for doc in documents]
         if len(set(document_ids)) != len(document_ids):
             raise ValueError("Duplicate document IDs found")
-    
-    def update_net_emissions(self):
-        self.netEmissions = self.emissions_offset - self.emissions_emitted
+   
+    @property
+    def netEmissions(self):
+        return self.emissions_offset - self.emissions_emitted
     
     def add_document(self, document):
         if any(document.id == doc.id for doc in self.documents):
             self.documents.append(document)
-            return "Document added to the action"
+            return self.documents
         else:
-            return "Document already exists in the action"
-    
+            raise  ValueError("Document already exists in the action")
+
+
+class Destruction(Action):
+    def __init__(self, id, logData, documents:list, agentUsers:list, cementKiln, address, startDate, endDate, createdDate, actionType: ActionTypes, emissionsOffset = 0, emissionsEmitted = 0):
+        super().__init__(id, documents, agentUsers, createdDate, actionType, emissionsOffset, emissionsEmitted)
+        self.cementKiln = cementKiln
+        self.address = address
+        self.startDate = startDate
+        self.endDate = endDate
+        self.logData = logData
+
+class Collection(Action):
+    def __init__(self, id, documents:list, agentUsers:list, createdDate, actionType: ActionTypes,  paymentAMT: float, paymentApiLink: str, primaryAgent: Agent, emissionsOffset = 0, emissionsEmitted = 0):
+        super().__init__(id, documents, agentUsers, createdDate, actionType, emissionsOffset, emissionsEmitted)
+        self.paymentAMT = paymentAMT
+        self.paymentApiLink = paymentApiLink
+        self.PrimaryAgent = primaryAgent
+        if primaryAgent.userType != "Agent":
+            raise ValueError("Primary agent must be an agent")
+        if primaryAgent not in agentUsers:
+            raise ValueError("Primary agent must be in agent users")
+        
