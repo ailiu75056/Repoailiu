@@ -16,12 +16,12 @@ def allocateOffset(offsetList:list, purchaseAmount:float, offsetPriceKG:float, o
     while remainingAmountKG > 0:
         offsetID, offsetKG = efficientAllocation()
         offsetAllocated= []
-        if remainingAmountKG > sum([x[1] for x in avaiableOffsets]): #check if available offset stock is less than the remaining amount
+        if remainingAmountKG > sum([x[1] for x in avaiableOffsets]): #check if available offset stock is less than the remaining amount if so then return
             return (offsetAllocated, remainingAmountKG*offsetPriceKG,False)
         if offsetKG > remainingAmountKG:
-            offsetAllocation.append((offsetID, remainingAmountKG*offsetPriceKG, customerId, datetime.now()))
+            offsetAllocation.append((offsetID, remainingAmountKG, customerId, datetime.now()))
             offsetAllocated.append((offsetID))
-            remainingAmountKG = 0
+            remainingAmountKG -= offsetKG
             return (offsetAllocated, remainingAmountKG*offsetPriceKG,True) #return the offset allocated and the remaining amount of 0
         else:
             offsetAllocation.append((offsetID, offsetKG, customerId, datetime.now()))
