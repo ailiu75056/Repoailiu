@@ -1,13 +1,15 @@
 import json
 import uvicorn # for local debugging
-
+from actions import Action, Collection, ActionTypes
 from datetime import datetime
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse, HTMLReponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import JSONResponse
+import uuid
 
+CollectionsMockDB = {}
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -61,5 +63,22 @@ async def get_document(document_id: int, request: Request):
 # buy offset based on an amount
 async def buy_offset(document_id: int, request: Request):
     return templates.TemplateResponse("offset.html", {"request": request, "document_id": document_id})
+
+@app.post("/api/collection/add", response_class=JSONResponse)
+# create a new purchase with refrigerant type, amount in KG, and amount paid
+async def collection_add(refrigerantType: str, amountKG: float, request: Request, paymentAMT: float, paymentApiLink= ""):
+    # perform logic to create a new purchase with the provided parameters
+    
+    id = "COL"+ str(uuid.uuid4())
+    check = lambda x: x in CollectionsMockDB.keys() 
+    if check(id) == True:
+        id = "COL"+ str(uuid.uuid4())
+        check(id)
+    else:
+        pass
+    collection = Collection(id, refrigerantType = refrigerantType, amountKG = amountKG, paymentAMT =paymentAMT , paymentApiLink =paymentApiLink, createdDate = datetime.now(), actionType = ActionTypes.Collection)
+    CollectionsMockDB[id] = collection
+    return templates.TemplateResponse("purchase.html", {"request": request, "refrigerantType": refrigerantType, "amountKG": amountKG, "amountPaid": paymentAMT, "paymentApiLink": paymentApiLink})
+
 
 
