@@ -1,7 +1,8 @@
 
 from pyairtable import Api
 from pyairtable.formulas import match
-api = Api('')
+import os
+api = Api(os.environ["AT_API_TOKEN"])
 baseId = 'appUBZ3kt562wt8Fo'
 table = api.table(baseId, 'RefrigerantProviders')
 

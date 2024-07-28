@@ -1,4 +1,6 @@
 import logging
+import os
+
 from telegram import Update, constants
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 from airtable import get_first_record_username, table, baseId, api, insert_provider_telegram_username
@@ -31,7 +33,7 @@ async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 if __name__ == '__main__':
-    application = ApplicationBuilder().token('').build()
+    application = ApplicationBuilder().token(os.environ["Telegram_Bot_TOKEN"]).build()
     
     start_handler = CommandHandler('start', start)
     application.add_handler(start_handler)
