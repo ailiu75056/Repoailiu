@@ -52,7 +52,7 @@ async def storeBarcode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     photo_file = await update.message.photo[-1].get_file()
     # Correctly store the file_id of the uploaded photo for later use
     context.user_data['barcode_photo'] = photo_file.file_id  # Preserve this line
-    result = update_refrigerant(baseId, api, tableManagement, context.chat_data['refrigerant_id'], {"BarcodePhoto": photo_file.file_id})
+    result = update_refrigerant(baseId, api, tableManagement, context.chat_data['refrigerant_id'], {"BarcodePhoto": [{"url": photo_file.file_path}]})
     print(result)
     await update.message.reply_text('<b>Photo uploaded successfully.Next upload a photo of the cylinder</b>',
                                     parse_mode='HTML'
@@ -65,7 +65,7 @@ async def storeCylinderPhoto(update: Update, context: ContextTypes.DEFAULT_TYPE)
     photo_file = await update.message.photo[-1].get_file()
     # Correctly store the file_id of the uploaded photo for later use
     context.user_data['cylinder_photo'] = photo_file.file_id  # Preserve this line
-    result = update_refrigerant(baseId, api, tableManagement, context.chat_data['refrigerant_id'], {"CylinderPhoto": photo_file.file_id})
+    result = update_refrigerant(baseId, api, tableManagement, context.chat_data['refrigerant_id'], {"CylinderPhoto": [{"url": photo_file.file_path}]})
     print(result)
     await update.message.reply_text('<b>Photo uploaded successfully.Next upload a photo of the signature</b>', parse_mode='HTML'
     )
@@ -76,7 +76,7 @@ async def storeSignaturePhoto(update: Update, context: ContextTypes.DEFAULT_TYPE
     photo_file = await update.message.photo[-1].get_file()
     # Correctly store the file_id of the uploaded photo for later use
     context.user_data['signature_photo'] = photo_file.file_id  # Preserve this line
-    result = update_refrigerant(baseId, api, tableManagement, context.chat_data['refrigerant_id'], {"SignaturePhoto": photo_file.file_id})
+    result = update_refrigerant(baseId, api, tableManagement, context.chat_data['refrigerant_id'], {"SignaturePhoto": [{"url": photo_file.file_path}]})
     print(result)
     await update.message.reply_text('<b>Photo uploaded successfully.Thank you. Refrigerant successfully created.</b>', parse_mode='HTML'
     )
