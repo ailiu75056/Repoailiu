@@ -12,17 +12,20 @@ tableChatlog= api.table(baseId, 'TelegramChatLog')
 
 def get_first_record_username(base_id, api, table, username):
     formula = match({"TelegramUserName": username})
+    print(formula)
     #result = table.first(formula=formula)
     result = table.all(formula=formula)
     print(result)
-    if 'PhoneNumber' in result[0]['fields'].keys():
-            ifPhoneNumber = True
+    if len(result) ==0:
+        return [0, False, 0]
     else:
-            ifPhoneNumber = False
-    if len(result) > 0:
+        if 'PhoneNumber' in result[0]['fields'].keys():
+                ifPhoneNumber = True
+        else:
+                ifPhoneNumber = False
         userId = result[0]['fields']['ProviderID']
-   
-    return [len(result), ifPhoneNumber, userId]
+    
+        return [len(result), ifPhoneNumber, userId]
 
 def insert_new_refrigerant(base_id, api, table, providerId, refrigerantType, amountKG=0):
     result = table.create({"RefrigerantType": str.upper(refrigerantType), "AmountKG": amountKG, "Provider": [providerId]})
@@ -39,6 +42,7 @@ def insert_provider_telegram_username(base_id, api, table, username, name, prima
 def update_provider_telegram_phoneNumber(base_id, api, table, userName, phoneNumber):
     formula = match({"TelegramUserName": userName})
     result = table.first(formula=formula)
+    print(result)
     table.update(result['id'], {"PhoneNumber": phoneNumber})
     return 0
 

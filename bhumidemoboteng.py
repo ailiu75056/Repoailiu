@@ -1,10 +1,11 @@
 import logging
 import os
 import datetime
+from imagedectection import *
 from telegram import Update, constants, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, ConversationHandler , ContextTypes, CommandHandler, MessageHandler, filters
 from airtable import *
-ADDREFRIGERANT, REFRIGERANTAMOUNT, CREATEREFRIGERANT,BARCODE, CYLINDERPHOTO, SIGNATUREPHOTO = range(6)
+ADDREFRIGERANT, REFRIGERANTAMOUNT, CREATEREFRIGERANT,BARCODE, APPLIANCEPHOTO, SIGNATUREPHOTO = range(6)
 chatContext = {}
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -49,23 +50,25 @@ async def CreateRefrigerant(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 async def storeBarcode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Stores the photo."""
+    
     photo_file = await update.message.photo[-1].get_file()
     # Correctly store the file_id of the uploaded photo for later use
     context.user_data['barcode_photo'] = photo_file.file_id  # Preserve this line
+    
+       
     result = update_refrigerant(baseId, api, tableManagement, context.chat_data['refrigerant_id'], {"BarcodePhoto": [{"url": photo_file.file_path}]})
     print(result)
-    await update.message.reply_text('<b>Photo uploaded successfully.Next upload a photo of the cylinder</b>',
-                                    parse_mode='HTML'
-    )
-    return CYLINDERPHOTO
+    await update.message.reply_text('<b>Photo uploaded successfully.Next upload a photo of the appliance</b>', parse_mode='HTML'
+        )
+    return APPLIANCEPHOTO
 
 
-async def storeCylinderPhoto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def storeAppliancePhoto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Stores the photo."""
     photo_file = await update.message.photo[-1].get_file()
     # Correctly store the file_id of the uploaded photo for later use
-    context.user_data['cylinder_photo'] = photo_file.file_id  # Preserve this line
-    result = update_refrigerant(baseId, api, tableManagement, context.chat_data['refrigerant_id'], {"CylinderPhoto": [{"url": photo_file.file_path}]})
+    context.user_data['appliance_photo'] = photo_file.file_id  # Preserve this line
+    result = update_refrigerant(baseId, api, tableManagement, context.chat_data['refrigerant_id'], {"AppliancePhoto": [{"url": photo_file.file_path}]})
     print(result)
     await update.message.reply_text('<b>Photo uploaded successfully.Next upload a photo of the signature</b>', parse_mode='HTML'
     )
@@ -95,10 +98,13 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     custom_keyboard = [[  contact_keyboard, decline_keyboard]] 
     regist_reply_markup = ReplyKeyboardMarkup(custom_keyboard, one_time_keyboard=True)
     username = update.message.from_user.username
+    id = update.message.from_user.id
     print(update.message)
-    x = get_first_record_username(baseId, api, tableProviders, username)
+    x = get_first_record_username(baseId, api, tableProviders, id)
+    print("x:")
+    print(x)
     if x[0] == 0:
-        insert_provider_telegram_username(baseId, api, tableProviders, username, update.message.from_user.first_name +"" + update.message.from_user.last_name,update.message.from_user.language_code)
+        insert_provider_telegram_username(baseId, api, tableProviders, str(id), update.message.from_user.first_name +"" + update.message.from_user.last_name,update.message.from_user.language_code)
         await context.bot.send_message(chat_id=update.effective_chat.id, text="You are now registered in our database. Please provide your contact number by clicking the button below.", reply_markup=regist_reply_markup)
     elif x[1] == False:
         await context.bot.send_message(chat_id=update.effective_chat.id, text="You are already registered in our database. Please provide your phone number by clicking the button below.", reply_markup=regist_reply_markup)
@@ -111,8 +117,9 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print("contact handler")
     print(update.message)
     phone_number = update.message.contact.phone_number
-    update_provider_telegram_phoneNumber(baseId, api, tableProviders, update.message.from_user.username, phone_number)
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="<b>Sorry, I didn't understand that command. Please open the menu and use one of the commands.</b>", parse_mode='HTML')
+    id = update.message.from_user.id
+    update_provider_telegram_phoneNumber(baseId, api, tableProviders, update.message.from_user.id, phone_number)
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="<b>Phone Number Updated", parse_mode='HTML')
 
 
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -137,8 +144,9 @@ if __name__ == '__main__':
         states={
             REFRIGERANTAMOUNT: [CallbackQueryHandler(RefrigerantAmount)],
             CREATEREFRIGERANT: [MessageHandler(filters.TEXT, CreateRefrigerant)],
-            BARCODE: [MessageHandler(filters.PHOTO, storeBarcode)],
-            CYLINDERPHOTO: [MessageHandler(filters.PHOTO, storeCylinderPhoto)],
+            BARCODE: [MessageHandler(filters.PHOTO, storeBarcode),
+                      CallbackQueryHandler(storeBarcode)],
+            APPLIANCEPHOTO: [MessageHandler(filters.PHOTO, storeAppliancePhoto)],
             SIGNATUREPHOTO: [MessageHandler(filters.PHOTO, storeSignaturePhoto)]
                             },
         fallbacks=[CommandHandler('cancel', cancel)],
