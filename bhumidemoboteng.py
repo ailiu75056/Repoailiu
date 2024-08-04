@@ -5,6 +5,7 @@ from imagedectection import *
 from telegram import Update, constants, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, ConversationHandler , ContextTypes, CommandHandler, MessageHandler, filters
 from airtable import *
+from barcode import get_barcode_from_url
 ADDREFRIGERANT, REFRIGERANTAMOUNT, CREATEREFRIGERANT,BARCODE, APPLIANCEPHOTO, SIGNATUREPHOTO = range(6)
 chatContext = {}
 logging.basicConfig(
@@ -54,9 +55,13 @@ async def storeBarcode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     photo_file = await update.message.photo[-1].get_file()
     # Correctly store the file_id of the uploaded photo for later use
     context.user_data['barcode_photo'] = photo_file.file_id  # Preserve this line
-    
-       
-    result = update_refrigerant(baseId, api, tableManagement, context.chat_data['refrigerant_id'], {"BarcodePhoto": [{"url": photo_file.file_path}]})
+    barcode = get_barcode_from_url(photo_file.file_path)
+    if barcode == False:
+        await update.message.reply_text('<b>Your image does not appear to be a barcode, please try again!</b>', parse_mode='HTML'
+        )
+        return BARCODE
+    print("Barcode is: " + barcode)
+    result = update_refrigerant(baseId, api, tableManagement, context.chat_data['refrigerant_id'], {"BarcodePhoto": [{"url": photo_file.file_path}],"BarcodeText": barcode})
     print(result)
     await update.message.reply_text('<b>Photo uploaded successfully.Next upload a photo of the appliance</b>', parse_mode='HTML'
         )
@@ -81,7 +86,7 @@ async def storeSignaturePhoto(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data['signature_photo'] = photo_file.file_id  # Preserve this line
     result = update_refrigerant(baseId, api, tableManagement, context.chat_data['refrigerant_id'], {"SignaturePhoto": [{"url": photo_file.file_path}]})
     print(result)
-    await update.message.reply_text('<b>Photo uploaded successfully.Thank you. Refrigerant successfully created.</b>', parse_mode='HTML'
+    await update.message.reply_text('<b>Photo uploaded successfully.Thank you. Refrigerant successfully created. Use the /addrefrigerant command to add another refrigerant.</b>', parse_mode='HTML'
     )
     return ConversationHandler.END
 
@@ -131,6 +136,10 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text('Bye! Hope to talk to you again soon.')
     return ConversationHandler.END
 
+async def switchtopic(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text('Bye! Hope to talk to you again soon.')
+    await update.message.reply_text('Bye2! Hope to talk to you again soon.')
+
 if __name__ == '__main__':
     application = ApplicationBuilder().token(os.environ["Telegram_Bot_TOKEN"]).build()
     
@@ -138,6 +147,9 @@ if __name__ == '__main__':
     application.add_handler(MessageHandler(filters.CONTACT, contact))
     start_handler = CommandHandler('start', start)
     application.add_handler(start_handler)
+
+    switch_handler = CommandHandler('switchtopic', switchtopic)
+    application.add_handler(switch_handler)
 
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('addrefrigerant', addRefrigerant)],
