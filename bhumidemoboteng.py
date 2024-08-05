@@ -1,17 +1,32 @@
 import logging
 import os
 import datetime
+import ollama
+import asyncio
+from langdetect import detect
 from imagedectection import *
 from telegram import Update, constants, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, ConversationHandler , ContextTypes, CommandHandler, MessageHandler, filters
+from telegram.ext.filters import MessageFilter
 from airtable import *
 from barcode import get_barcode_from_url
 ADDREFRIGERANT, REFRIGERANTAMOUNT, CREATEREFRIGERANT,BARCODE, APPLIANCEPHOTO, SIGNATUREPHOTO = range(6)
+REFRIGERANTCHAT, NONENGLISHCHAT, ENGLISHCHAT = range(3)
 chatContext = {}
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
+
+chunksize = 256
+
+class NonEng(MessageFilter):
+    def filter(self, message):
+        print("Message is: " + detect(message.text)+ ' '+ message.text)
+        return detect(message.text) != 'en'
+
+# Remember to initialize the class.
+filter_NonEng = NonEng()
 
 
 async def addRefrigerant(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -137,8 +152,103 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 async def switchtopic(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text('Bye! Hope to talk to you again soon.')
-    await update.message.reply_text('Bye2! Hope to talk to you again soon.')
+    #reset context window for the bot.
+    context.user_data['conversation'] = ''
+    await update.message.reply_text('Conversation topic switched. Send another message start a new conversation.')
+    if context.user_data.get('language') == 'en':
+        return REFRIGERANTCHAT
+    else:
+        return NONENGLISHCHAT
+   
+
+async def refrigerantAdvice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text('Send a message to our advice bot on refrigerants. Type /cancel to stop the conversation.')
+    if detect(update.message.text) != 'en':
+        return NONENGLISHCHAT
+    return REFRIGERANTCHAT
+
+
+async def refrigerantChat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    messagetext = update.message.text
+    if context.user_data.get('conversation') == None:
+        context.user_data['conversation'] = ''
+    context.user_data['conversation'] += '\nuser:' + messagetext
+    stream = ollama.chat(
+        model='llama3',
+        messages=[{'role': 'user', 'content': 'Succinctly answer this question: '+ context.user_data['conversation']}],
+        stream=True,
+        options = {
+                "num_predict": 2048,
+            })
+    await update.message.reply_text('Message Recieved. Please wait while our Bhumi bot gathers the best information for you.')
+    cumChunksize = 0
+    message=''
+    #parse through bot stream and send a message to user when there is a chunk of 256 characters then wait again until the mesesage is complete.
+    for chunk in stream:
+        cumChunksize += len(chunk['message']['content'])
+        message += chunk['message']['content']
+        if cumChunksize >= chunksize:
+            context.user_data['conversation'] += '\nbot: ' + message
+            print(message)
+            await update.message.reply_text(message)
+            message = ''
+            cumChunksize = 0
+    await update.message.reply_text('Thank you for asking Bhumi Bot for adivce. Please ask another question or use the /switchtopic command to change the topic or /cancel command to end the conversation.')
+
+
+
+    return REFRIGERANTCHAT
+
+
+
+async def NonEngChat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    messagetext = update.message.text
+    context.user_data['language']= detect(messagetext)
+    if context.user_data.get('conversation') == None:
+        context.user_data['conversation'] = ''
+    context.user_data['conversation'] += '\nuser:' + messagetext
+    translatedText = ollama.chat(
+        model='llama3',
+        messages=[{'role': 'user', 'content': f'Figure out the language of this message- {messagetext}  then Translate the following message into the same language-  Message Recieved. Please wait while our Bhumi bot gathers the best information for you.'}],
+        stream=False,
+        options = {
+                "num_predict": 108,
+            })
+    translatedMessage = translatedText['message']['content']
+    await update.message.reply_text(translatedMessage)
+    print('initiating the llama bot')
+    stream = ollama.chat(
+        model='llama3',
+        messages=[{'role': 'user', 'content': 'Respond in the same language as this question and ONLY in that lanague, no english: '+ context.user_data['conversation']}],
+        stream=True,
+        options = {
+                "num_predict": 2048,
+            })
+    
+    cumChunksize = 0
+    message=''
+    #parse through bot stream and send a message to user when there is a chunk of 256 characters then wait again until the mesesage is complete.
+    for chunk in stream:
+        cumChunksize += len(chunk['message']['content'])
+        message += chunk['message']['content']
+        if cumChunksize >= chunksize:
+            context.user_data['conversation'] += '\nbot: ' + message
+            print(message)
+            
+            message = ''
+            cumChunksize = 0
+    if cumChunksize <= chunksize:
+        await update.message.reply_text(message)
+
+    return NONENGLISHCHAT
+
+
+
+
+
+
+
+
 
 if __name__ == '__main__':
     application = ApplicationBuilder().token(os.environ["Telegram_Bot_TOKEN"]).build()
@@ -150,8 +260,8 @@ if __name__ == '__main__':
 
     switch_handler = CommandHandler('switchtopic', switchtopic)
     application.add_handler(switch_handler)
-
-    conv_handler = ConversationHandler(
+    #handlers for adding refrigerants
+    conv_addRefrigerants_handler = ConversationHandler(
         entry_points=[CommandHandler('addrefrigerant', addRefrigerant)],
         states={
             REFRIGERANTAMOUNT: [CallbackQueryHandler(RefrigerantAmount)],
@@ -163,9 +273,24 @@ if __name__ == '__main__':
                             },
         fallbacks=[CommandHandler('cancel', cancel)],
     )
-    application.add_handler(conv_handler)
+    application.add_handler(conv_addRefrigerants_handler)
     register_handler = CommandHandler('register', register)
     application.add_handler(register_handler)
+
+    
+    conv_RefrigerantAdvice_handler = ConversationHandler(
+        entry_points=[CommandHandler('refrigerantadvice', refrigerantAdvice)],
+        states={
+            # don't need filter here because its controlled by refrigerantadvice handler
+            NONENGLISHCHAT: [MessageHandler(filters.TEXT, NonEngChat)],
+            REFRIGERANTCHAT: [MessageHandler(filters.TEXT, refrigerantChat)],
+            
+                            },
+        fallbacks=[CommandHandler('cancel', cancel),CommandHandler('switchtopic', switchtopic)],
+    )
+
+    application.add_handler(conv_RefrigerantAdvice_handler)
+
 
     unknown_handler = MessageHandler(filters.COMMAND, unknown)
     application.add_handler(unknown_handler)
